@@ -6,6 +6,7 @@
 
 - 从指定 Organization 中移除用户
 - 从指定 Organization 中移除除 Owner 之外的所有用户
+- 列出可访问组织中的 Owner 和 Member 并导出 CSV
 - 将用户添加到指定 Enterprise Team
 - 将用户添加到指定 Cost Center
 
@@ -83,6 +84,10 @@ cp config.example.json config.json
   "remove_non_owners_from_org": {
     "org": "YOUR_ORG"
   },
+  "export_org_members": {
+    "output": "org_members.csv",
+    "orgs": []
+  },
   "add_to_team": {
     "team": "YOUR_ENTERPRISE_TEAM_SLUG_OR_ID"
   },
@@ -108,6 +113,8 @@ python manage_users.py --config config.json add-to-team
 | Cost Center | `qifengemu-costcenter1` |
 | Cost Center ID | 自动解析为 `84299cbd-6777-49f3-8fcf-6a2a20217459` |
 | CSV | `users.csv` |
+| 导出成员 CSV | `org_members.csv` |
+| 导出组织范围 | `qifengemu-org1` |
 | dry-run | `false` |
 
 当前配置中的 token 不应写入 README。文档中一律使用脱敏占位值展示。
@@ -117,8 +124,18 @@ python manage_users.py --config config.json add-to-team
 ```bash
 python manage_users.py --config config.json remove-from-org
 python manage_users.py --config config.json remove-non-owners-from-org
+python manage_users.py --config config.json export-org-members
 python manage_users.py --config config.json add-to-team
 python manage_users.py --config config.json add-to-cost-center
+```
+
+当前配置中的 `export_org_members.orgs` 指定为 `qifengemu-org1`，因此 `export-org-members` 只会导出该组织。如果希望自动导出当前 token 可访问的所有组织，请将本地 `config.json` 中的 `orgs` 改为空数组：
+
+```json
+"export_org_members": {
+  "output": "org_members.csv",
+  "orgs": []
+}
 ```
 
 由于当前 `dry_run` 为 `false`，上述命令会真实调用 GitHub API。如需先预览操作，请在命令末尾加上 `--dry-run`。
@@ -224,7 +241,62 @@ GET /orgs/{org}/members?role=member&per_page=100&page={page}
 DELETE /orgs/{org}/members/{username}
 ```
 
-## 3. 添加用户到 Enterprise Team
+## 3. 导出每个组织中的成员到 CSV
+
+这个命令会列出当前 token 可访问的组织，并分别查询每个组织的 Owner 和 Member，导出到 CSV。
+
+默认输出文件为 `org_members.csv`，该文件已在 [.gitignore](.gitignore) 中忽略。
+
+导出所有可访问组织：
+
+```bash
+python manage_users.py export-org-members \
+  --output org_members.csv
+```
+
+使用配置文件导出：
+
+```bash
+python manage_users.py --config config.json export-org-members
+```
+
+只导出指定组织，可以重复传入 `--org`：
+
+```bash
+python manage_users.py export-org-members \
+  --org YOUR_ORG_1 \
+  --org YOUR_ORG_2 \
+  --output org_members.csv
+```
+
+配置文件中对应字段为：
+
+```json
+"export_org_members": {
+  "output": "org_members.csv",
+  "orgs": ["YOUR_ORG_1", "YOUR_ORG_2"]
+}
+```
+
+如果 `orgs` 为空数组或省略，脚本会通过 `GET /user/orgs` 自动获取当前 token 可访问的组织。
+
+CSV 字段：
+
+```csv
+organization,username,role
+octo-org,monalisa,owner
+octo-org,octocat,member
+```
+
+对应 API：
+
+```text
+GET /user/orgs?per_page=100&page={page}
+GET /orgs/{org}/members?role=admin&per_page=100&page={page}
+GET /orgs/{org}/members?role=member&per_page=100&page={page}
+```
+
+## 4. 添加用户到 Enterprise Team
 
 先 dry-run：
 
@@ -261,7 +333,7 @@ POST /enterprises/{enterprise}/teams/{enterprise-team}/memberships/add
 }
 ```
 
-## 4. 添加用户到 Cost Center
+## 5. 添加用户到 Cost Center
 
 脚本支持两种方式：
 

@@ -121,6 +121,52 @@ class OperationTests(unittest.TestCase):
         client.get.assert_any_call("/orgs/octo-org/members?role=member&per_page=100&page=1")
         client.get.assert_any_call("/orgs/octo-org/members?role=member&per_page=100&page=2")
 
+    def test_list_accessible_orgs_uses_authenticated_user_orgs_api(self):
+        client = Mock()
+        client.get.side_effect = [
+            manage_users.ApiResponse(
+                status_code=200,
+                data=[{"login": "octo-org"}, {"login": "acme-org"}],
+                message="OK",
+            ),
+            manage_users.ApiResponse(status_code=200, data=[], message="OK"),
+        ]
+
+        orgs = manage_users.list_accessible_orgs(client)
+
+        self.assertEqual(orgs, ["octo-org", "acme-org"])
+        client.get.assert_any_call("/user/orgs?per_page=100&page=1")
+        client.get.assert_any_call("/user/orgs?per_page=100&page=2")
+
+    def test_export_org_members_writes_owner_and_member_rows_to_csv(self):
+        client = Mock()
+        client.get.side_effect = [
+            manage_users.ApiResponse(status_code=200, data=[{"login": "octo-org"}], message="OK"),
+            manage_users.ApiResponse(status_code=200, data=[], message="OK"),
+            manage_users.ApiResponse(status_code=200, data=[{"login": "owner-user"}], message="OK"),
+            manage_users.ApiResponse(status_code=200, data=[], message="OK"),
+            manage_users.ApiResponse(status_code=200, data=[{"login": "member-user"}], message="OK"),
+            manage_users.ApiResponse(status_code=200, data=[], message="OK"),
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "org_members.csv"
+
+            summary = manage_users.export_org_members(client=client, output_path=output_path)
+
+            with output_path.open(encoding="utf-8") as output_file:
+                rows = list(csv.DictReader(output_file))
+
+        self.assertEqual(summary.success, 2)
+        self.assertEqual(
+            rows,
+            [
+                {"organization": "octo-org", "username": "owner-user", "role": "owner"},
+                {"organization": "octo-org", "username": "member-user", "role": "member"},
+            ],
+        )
+        client.get.assert_any_call("/orgs/octo-org/members?role=admin&per_page=100&page=1")
+        client.get.assert_any_call("/orgs/octo-org/members?role=member&per_page=100&page=1")
+
     def test_remove_non_owners_from_org_lists_members_and_deletes_after_confirmation(self):
         client = Mock()
         client.get.side_effect = [
@@ -300,6 +346,41 @@ class CliTests(unittest.TestCase):
             resolved = manage_users.apply_config(args)
 
             self.assertEqual(resolved.cost_center, "Engineering")
+
+    def test_config_file_supplies_export_org_members_options(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "export_org_members": {
+                            "output": "members.csv",
+                            "orgs": ["octo-org", "acme-org"],
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            args = manage_users.build_parser().parse_args(["--config", str(config_path), "export-org-members"])
+
+            resolved = manage_users.apply_config(args)
+
+            self.assertEqual(resolved.output, "members.csv")
+            self.assertEqual(resolved.orgs, ["octo-org", "acme-org"])
+
+    def test_config_file_allows_empty_export_org_list(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            config_path.write_text(
+                json.dumps({"export_org_members": {"output": "members.csv", "orgs": []}}),
+                encoding="utf-8",
+            )
+            args = manage_users.build_parser().parse_args(["--config", str(config_path), "export-org-members"])
+
+            resolved = manage_users.apply_config(args)
+
+            self.assertEqual(resolved.output, "members.csv")
+            self.assertEqual(resolved.orgs, [])
 
     def test_command_line_arguments_override_config_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:

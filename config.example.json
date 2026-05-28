@@ -11,6 +11,10 @@
   "remove_non_owners_from_org": {
     "org": "YOUR_ORG"
   },
+  "export_org_members": {
+    "output": "org_members.csv",
+    "orgs": []
+  },
   "add_to_team": {
     "team": "YOUR_ENTERPRISE_TEAM_SLUG_OR_ID"
   },

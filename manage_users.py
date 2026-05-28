@@ -203,6 +203,60 @@ def list_non_owner_org_members(client: GitHubClient, org: str) -> list[str]:
     return members
 
 
+def list_accessible_orgs(client: GitHubClient) -> list[str]:
+    orgs: list[str] = []
+    page = 1
+    while True:
+        response = client.get(f"/user/orgs?per_page=100&page={page}")
+        if not isinstance(response.data, list) or not response.data:
+            break
+        for org in response.data:
+            login = org.get("login") if isinstance(org, dict) else None
+            if login:
+                orgs.append(login)
+        page += 1
+    return orgs
+
+
+def list_org_members_by_role(client: GitHubClient, org: str, role: str) -> list[str]:
+    encoded_org = quote(org, safe="")
+    members: list[str] = []
+    page = 1
+    while True:
+        response = client.get(f"/orgs/{encoded_org}/members?role={role}&per_page=100&page={page}")
+        if not isinstance(response.data, list) or not response.data:
+            break
+        for member in response.data:
+            login = member.get("login") if isinstance(member, dict) else None
+            if login:
+                members.append(login)
+        page += 1
+    return members
+
+
+def export_org_members(
+    client: GitHubClient,
+    output_path: str | Path,
+    orgs: list[str] | None = None,
+) -> OperationSummary:
+    target_orgs = orgs or list_accessible_orgs(client)
+    rows: list[dict[str, str]] = []
+
+    for org in target_orgs:
+        for username in list_org_members_by_role(client, org, "admin"):
+            rows.append({"organization": org, "username": username, "role": "owner"})
+        for username in list_org_members_by_role(client, org, "member"):
+            rows.append({"organization": org, "username": username, "role": "member"})
+
+    with Path(output_path).open("w", newline="", encoding="utf-8") as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=["organization", "username", "role"])
+        writer.writeheader()
+        writer.writerows(rows)
+
+    print(f"Exported {len(rows)} organization member row(s) to {output_path}")
+    return OperationSummary(success=len(rows))
+
+
 def remove_non_owners_from_org(
     client: GitHubClient,
     org: str,
@@ -359,6 +413,14 @@ def build_parser() -> argparse.ArgumentParser:
     cost_center_parser.add_argument("--cost-center", help="Cost center name or ID.")
     cost_center_parser.add_argument("--cost-center-id", help="Cost center ID.")
 
+    export_members_parser = subparsers.add_parser(
+        "export-org-members",
+        help="Export members for accessible organizations to CSV.",
+    )
+    add_common_arguments(export_members_parser, suppress_defaults=True)
+    export_members_parser.add_argument("--output", help="Output CSV path.")
+    export_members_parser.add_argument("--org", action="append", dest="orgs", help="Organization to export. Can be repeated.")
+
     return parser
 
 
@@ -424,9 +486,12 @@ def apply_config(args: argparse.Namespace) -> argparse.Namespace:
         set_if_missing(args, "team", command_config.get("team"))
         set_if_missing(args, "cost_center", command_config.get("cost_center", command_config.get("cost_center_name")))
         set_if_missing(args, "cost_center_id", command_config.get("cost_center_id"))
+        set_if_missing(args, "output", command_config.get("output"))
+        set_if_missing(args, "orgs", command_config.get("orgs"))
 
     set_if_missing(args, "base_url", DEFAULT_BASE_URL)
     set_if_missing(args, "failed_csv", "failed_users.csv")
+    set_if_missing(args, "output", "org_members.csv")
     if not hasattr(args, "dry_run"):
         args.dry_run = False
     return args
@@ -435,7 +500,11 @@ def apply_config(args: argparse.Namespace) -> argparse.Namespace:
 def set_if_missing(args: argparse.Namespace, attr: str, value: Any) -> None:
     if value is None:
         return
-    if not hasattr(args, attr) or getattr(args, attr) in {None, ""}:
+    if not hasattr(args, attr):
+        setattr(args, attr, value)
+        return
+    current_value = getattr(args, attr)
+    if current_value is None or current_value == "":
         setattr(args, attr, value)
 
 
@@ -483,6 +552,12 @@ def run(args: argparse.Namespace) -> OperationSummary:
             cost_center=getattr(args, "cost_center", None),
             usernames=usernames,
             dry_run=args.dry_run,
+        )
+    if args.command == "export-org-members":
+        return export_org_members(
+            client=client,
+            output_path=args.output,
+            orgs=getattr(args, "orgs", None),
         )
     raise ValueError(f"Unsupported command: {args.command}")
 
