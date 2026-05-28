@@ -1,0 +1,4 @@
+config.json
+failed_users.csv
+__pycache__/
+*.py[cod]

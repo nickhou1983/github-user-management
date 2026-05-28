@@ -1,0 +1,20 @@
+{
+  "token": "YOUR_GITHUB_PAT_CLASSIC",
+  "csv": "users.csv",
+  "enterprise": "YOUR_ENTERPRISE_SLUG",
+  "base_url": "https://api.github.com",
+  "failed_csv": "failed_users.csv",
+  "dry_run": true,
+  "remove_from_org": {
+    "org": "YOUR_ORG"
+  },
+  "remove_non_owners_from_org": {
+    "org": "YOUR_ORG"
+  },
+  "add_to_team": {
+    "team": "YOUR_ENTERPRISE_TEAM_SLUG_OR_ID"
+  },
+  "add_to_cost_center": {
+    "cost_center": "YOUR_COST_CENTER_NAME_OR_ID"
+  }
+}
