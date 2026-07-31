@@ -161,13 +161,6 @@ python manage_users.py --config config.json add-to-team --team ANOTHER_TEAM
 
 默认输出文件为 `org_members.csv`，该文件已在 [.gitignore](.gitignore) 中忽略。
 
-导出所有可访问组织：
-
-```bash
-python manage_users.py export-org-members \
-  --output org_members.csv
-```
-
 使用配置文件导出：
 
 ```bash
@@ -229,7 +222,7 @@ cp org_members.csv users.csv
 
 ```bash
 python manage_users.py remove-non-owners-from-org \
-  --org YOUR_ORG \
+  --config config.json \
   --dry-run
 ```
 
@@ -237,14 +230,10 @@ python manage_users.py remove-non-owners-from-org \
 
 ```bash
 python manage_users.py remove-non-owners-from-org \
-  --org YOUR_ORG
+  --config config.json
 ```
 
-使用配置文件：
 
-```bash
-python manage_users.py --config config.json remove-non-owners-from-org --dry-run
-```
 
 真实执行时，脚本会显示将移除的用户数量和组织名，并要求输入：
 
