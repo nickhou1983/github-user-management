@@ -252,23 +252,13 @@ DELETE /orgs/{org}/members/{username}
 
 ## 3. 添加用户到 Enterprise Team
 
-先 dry-run：
-
-```bash
-python manage_users.py add-to-team \
-  --csv users.csv \
-  --enterprise YOUR_ENTERPRISE \
-  --team YOUR_ENTERPRISE_TEAM \
-  --dry-run
-```
 
 执行真实添加：
 
 ```bash
 python manage_users.py add-to-team \
   --csv users.csv \
-  --enterprise YOUR_ENTERPRISE \
-  --team YOUR_ENTERPRISE_TEAM
+  --config config.json
 ```
 
 `--team` 可以传入 GitHub API 可识别的 Enterprise Team slug 或 ID。如果你的 Enterprise Team slug 包含 `ent:` 前缀，请按实际 slug 一并传入。
