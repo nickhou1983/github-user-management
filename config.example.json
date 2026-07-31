@@ -13,7 +13,7 @@
   },
   "export_org_members": {
     "output": "org_members.csv",
-    "orgs": []
+    "orgs": ["YOUR_ORG"]
   },
   "add_to_team": {
     "team": "YOUR_ENTERPRISE_TEAM_SLUG_OR_ID"
