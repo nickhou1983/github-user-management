@@ -31,20 +31,6 @@
 | 添加到 Enterprise Team | `admin:enterprise` |
 | 添加到 Cost Center | `admin:enterprise` |
 
-Enterprise Team 和 Cost Center 相关 API 不适用于 fine-grained PAT。
-
-可以通过环境变量提供 token：
-
-```bash
-export GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
-```
-
-也可以在命令中显式传入：
-
-```bash
-python manage_users.py --token ghp_xxxxxxxxxxxxxxxxxxxx ...
-```
-
 ## 用户清单 CSV
 
 CSV 文件必须包含 `username` 列。其他列会被忽略。
@@ -61,7 +47,7 @@ octocat
 
 ## 配置文件
 
-仓库中提供了可提交的示例配置文件：[config.example.json](config.example.json)。本地真实配置文件使用 `config.json`，并已在 [.gitignore](.gitignore) 中忽略，避免把真实 token 提交到 GitHub。
+仓库中提供了可提交的示例配置文件：[config.example.json](config.example.json)。
 
 首次使用时可以复制模板：
 
@@ -100,60 +86,28 @@ cp config.example.json config.json
 }
 ```
 
-使用配置文件运行：
+### 通用配置项
 
-```bash
-python manage_users.py --config config.json add-to-team
-```
+| 配置项 | 说明 |
+| --- | --- |
+| `token` | GitHub PAT (classic)。优先级：`--token` > `GITHUB_TOKEN` 环境变量 > 配置文件。不建议把真实 token 提交到版本库 |
+| `csv` | 用户清单 CSV 路径，必须包含 `username` 列。用于 `remove-from-org`、`add-to-team`、`add-to-cost-center` |
+| `enterprise` | Enterprise slug，即企业设置 URL `https://github.com/enterprises/<slug>` 中的 `<slug>`。Enterprise Team 和 Cost Center 操作必填 |
+| `base_url` | GitHub API 地址，默认 `https://api.github.com`。GHE.com 使用 `https://api.SUBDOMAIN.ghe.com` |
+| `failed_csv` | 失败用户报告输出路径，默认 `failed_users.csv` |
+| `dry_run` | 设为 `true` 时只打印将执行的操作，不调用 GitHub API。命令行 `--dry-run` 也可开启 |
 
-基于当前配置，可以直接运行：
+### 子命令配置项
 
-```bash
-python manage_users.py --config config.json remove-from-org
-python manage_users.py --config config.json remove-non-owners-from-org
-python manage_users.py --config config.json export-org-members
-python manage_users.py --config config.json add-to-team
-python manage_users.py --config config.json add-to-cost-center
-```
-
-当前配置中的 `export_org_members.orgs` 指定为 `qifengemu-org1`，因此 `export-org-members` 只会导出该组织。如果希望自动导出当前 token 可访问的所有组织，请将本地 `config.json` 中的 `orgs` 改为空数组：
-
-```json
-"export_org_members": {
-  "output": "org_members.csv",
-  "orgs": []
-}
-```
-
-由于当前 `dry_run` 为 `false`，上述命令会真实调用 GitHub API。如需先预览操作，请在命令末尾加上 `--dry-run`。
-
-覆盖配置文件中的某个值：
-
-```bash
-python manage_users.py --config config.json add-to-team --team ANOTHER_TEAM
-```
-
-配置文件支持 `token` 字段，但不建议把真实 token 提交到版本库；优先使用 `GITHUB_TOKEN` 环境变量或 `--token`。如果确实要在本地配置中使用 token，请只保存在本机私有文件中，并避免把该文件上传到 GitHub。
-
-## 通用参数
-
-通用参数可以放在子命令前，也可以放在子命令后。
-
-| 参数 | 必填 | 说明 |
-| --- | --- | --- |
-| `--config` | 否 | JSON 配置文件路径 |
-| `--csv` | 是 | 用户清单 CSV 路径 |
-| `--token` | 否 | GitHub PAT classic；未提供时读取 `GITHUB_TOKEN` |
-| `--enterprise` | Enterprise 操作必填 | Enterprise slug，例如企业设置 URL 中的 `https://github.com/enterprises/<slug>` |
-| `--dry-run` | 否 | 只打印将执行的操作，不调用 GitHub API |
-| `--base-url` | 否 | GitHub API 地址，默认 `https://api.github.com` |
-| `--failed-csv` | 否 | 失败用户报告路径，默认 `failed_users.csv` |
-
-如果使用 GHE.com dedicated subdomain，请指定：
-
-```bash
---base-url https://api.SUBDOMAIN.ghe.com
-```
+| 配置项 | 说明 |
+| --- | --- |
+| `remove_from_org.org` | 要移除用户的 Organization 名称 |
+| `remove_non_owners_from_org.org` | 要移除非 Owner 成员的 Organization 名称 |
+| `export_org_members.output` | 导出成员的 CSV 输出路径，默认 `org_members.csv` |
+| `export_org_members.orgs` | 要导出的 Organization 数组。为空数组或省略时，自动导出当前 token 可访问的所有组织 |
+| `add_to_team.team` | 目标 Enterprise Team 的 slug 或 ID |
+| `add_to_cost_center.cost_center` | 目标 Cost Center 的名称或 ID，脚本会自动解析为真实 ID |
+| `add_to_cost_center.cost_center_id` | 直接指定 Cost Center ID，跳过名称解析。与 `cost_center` 二选一 |
 
 ## 1. 导出 Organization 中的用户，更新 users.csv
 
@@ -233,8 +187,6 @@ python manage_users.py remove-non-owners-from-org \
   --config config.json
 ```
 
-
-
 真实执行时，脚本会显示将移除的用户数量和组织名，并要求输入：
 
 ```text
@@ -251,7 +203,6 @@ DELETE /orgs/{org}/members/{username}
 ```
 
 ## 3. 添加用户到 Enterprise Team
-
 
 执行真实添加：
 
