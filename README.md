@@ -162,7 +162,6 @@ GET /orgs/{org}/members?role=member&per_page=100&page={page}
 导出的 CSV 已包含 `username` 列，脚本读取 CSV 时会忽略其他列，因此可以直接覆盖 `users.csv`：
 
 ```bash
-python manage_users.py export-org-members --org YOUR_ORG --output org_members.csv
 cp org_members.csv users.csv
 ```
 
