@@ -121,15 +121,6 @@ cp config.example.json config.json
 python manage_users.py --config config.json export-org-members
 ```
 
-只导出指定组织，可以重复传入 `--org`：
-
-```bash
-python manage_users.py export-org-members \
-  --org YOUR_ORG_1 \
-  --org YOUR_ORG_2 \
-  --output org_members.csv
-```
-
 配置文件中对应字段为：
 
 ```json
