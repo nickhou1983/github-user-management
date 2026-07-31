@@ -4,7 +4,7 @@
   "enterprise": "YOUR_ENTERPRISE_SLUG",
   "base_url": "https://api.github.com",
   "failed_csv": "failed_users.csv",
-  "dry_run": true,
+  "dry_run": false,
   "remove_from_org": {
     "org": "YOUR_ORG"
   },
