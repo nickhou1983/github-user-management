@@ -211,8 +211,6 @@ python manage_users.py add-to-team \
   --config config.json
 ```
 
-`--team` 可以传入 GitHub API 可识别的 Enterprise Team slug 或 ID。如果你的 Enterprise Team slug 包含 `ent:` 前缀，请按实际 slug 一并传入。
-
 对应 API：
 
 ```text
