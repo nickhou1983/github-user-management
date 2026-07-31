@@ -2,12 +2,15 @@
 
 用于通过 GitHub REST API 批量管理 GitHub 用户账户的 Python CLI 脚本。
 
-当前支持三类独立操作：
+常见使用流程分为三步：
 
-- 从指定 Organization 中移除用户
-- 从指定 Organization 中移除除 Owner 之外的所有用户
-- 列出可访问组织中的 Owner 和 Member 并导出 CSV
-- 将用户添加到指定 Enterprise Team
+1. 导出 Organization 中的用户，更新 users.csv
+2. 移除 Organization 中除 Owner 之外的所有用户
+3. 添加用户到 Enterprise Team
+
+此外还支持两个独立操作：
+
+- 按 CSV 清单从指定 Organization 中移除用户
 - 将用户添加到指定 Cost Center
 
 ## 环境要求
@@ -103,22 +106,6 @@ cp config.example.json config.json
 python manage_users.py --config config.json add-to-team
 ```
 
-当前本地 `config.json` 已配置以下目标：
-
-| 配置项 | 当前值 |
-| --- | --- |
-| Enterprise | `qifengemu` |
-| Organization | `qifengemu-org1` |
-| Enterprise Team | `qifengemu-team1` |
-| Cost Center | `qifengemu-costcenter1` |
-| Cost Center ID | 自动解析为 `84299cbd-6777-49f3-8fcf-6a2a20217459` |
-| CSV | `users.csv` |
-| 导出成员 CSV | `org_members.csv` |
-| 导出组织范围 | `qifengemu-org1` |
-| dry-run | `false` |
-
-当前配置中的 token 不应写入 README。文档中一律使用脱敏占位值展示。
-
 基于当前配置，可以直接运行：
 
 ```bash
@@ -168,80 +155,7 @@ python manage_users.py --config config.json add-to-team --team ANOTHER_TEAM
 --base-url https://api.SUBDOMAIN.ghe.com
 ```
 
-## 1. 从 Organization 移除用户
-
-先用 dry-run 检查将要移除的用户：
-
-```bash
-python manage_users.py remove-from-org \
-  --csv users.csv \
-  --org YOUR_ORG \
-  --dry-run
-```
-
-执行真实移除：
-
-```bash
-python manage_users.py remove-from-org \
-  --csv users.csv \
-  --org YOUR_ORG
-```
-
-真实执行时，脚本会显示将移除的用户数量和组织名，并要求输入：
-
-```text
-yes
-```
-
-只有输入完全匹配 `yes` 时才会调用 API；其他输入会中止操作。
-
-对应 API：
-
-```text
-DELETE /orgs/{org}/members/{username}
-```
-
-## 2. 从 Organization 移除除 Owner 之外的所有用户
-
-这个命令会先调用 GitHub API 查询组织中 `role=member` 的成员，只移除非 Owner 用户。Owner 不会出现在该查询结果中，因此不会被删除。
-
-先用 dry-run 检查将要移除的非 Owner 用户：
-
-```bash
-python manage_users.py remove-non-owners-from-org \
-  --org YOUR_ORG \
-  --dry-run
-```
-
-执行真实移除：
-
-```bash
-python manage_users.py remove-non-owners-from-org \
-  --org YOUR_ORG
-```
-
-使用配置文件：
-
-```bash
-python manage_users.py --config config.json remove-non-owners-from-org --dry-run
-```
-
-真实执行时，脚本会显示将移除的用户数量和组织名，并要求输入：
-
-```text
-yes
-```
-
-只有输入完全匹配 `yes` 时才会调用删除 API；其他输入会中止操作。
-
-对应 API：
-
-```text
-GET /orgs/{org}/members?role=member&per_page=100&page={page}
-DELETE /orgs/{org}/members/{username}
-```
-
-## 3. 导出每个组织中的成员到 CSV
+## 1. 导出 Organization 中的用户，更新 users.csv
 
 这个命令会列出当前 token 可访问的组织，并分别查询每个组织的 Owner 和 Member，导出到 CSV。
 
@@ -296,7 +210,58 @@ GET /orgs/{org}/members?role=admin&per_page=100&page={page}
 GET /orgs/{org}/members?role=member&per_page=100&page={page}
 ```
 
-## 4. 添加用户到 Enterprise Team
+### 用导出结果更新 users.csv
+
+导出的 CSV 已包含 `username` 列，脚本读取 CSV 时会忽略其他列，因此可以直接覆盖 `users.csv`：
+
+```bash
+python manage_users.py export-org-members --org YOUR_ORG --output org_members.csv
+cp org_members.csv users.csv
+```
+
+如果只需要处理部分用户，请在覆盖后删除不需要的行（保留表头）。
+
+## 2. 从 Organization 移除除 Owner 之外的所有用户
+
+这个命令会先调用 GitHub API 查询组织中 `role=member` 的成员，只移除非 Owner 用户，无需读取用户清单 CSV。Owner 不会出现在该查询结果中，因此不会被删除。
+
+先用 dry-run 检查将要移除的非 Owner 用户：
+
+```bash
+python manage_users.py remove-non-owners-from-org \
+  --org YOUR_ORG \
+  --dry-run
+```
+
+执行真实移除：
+
+```bash
+python manage_users.py remove-non-owners-from-org \
+  --org YOUR_ORG
+```
+
+使用配置文件：
+
+```bash
+python manage_users.py --config config.json remove-non-owners-from-org --dry-run
+```
+
+真实执行时，脚本会显示将移除的用户数量和组织名，并要求输入：
+
+```text
+yes
+```
+
+只有输入完全匹配 `yes` 时才会调用删除 API；其他输入会中止操作。
+
+对应 API：
+
+```text
+GET /orgs/{org}/members?role=member&per_page=100&page={page}
+DELETE /orgs/{org}/members/{username}
+```
+
+## 3. 添加用户到 Enterprise Team
 
 先 dry-run：
 
@@ -331,6 +296,41 @@ POST /enterprises/{enterprise}/teams/{enterprise-team}/memberships/add
 {
   "usernames": ["monalisa", "octocat"]
 }
+```
+
+## 4. 按 CSV 清单从 Organization 移除用户
+
+这个命令只移除 `users.csv` 中列出的用户，适合需要精确控制移除范围的场景。
+
+先用 dry-run 检查将要移除的用户：
+
+```bash
+python manage_users.py remove-from-org \
+  --csv users.csv \
+  --org YOUR_ORG \
+  --dry-run
+```
+
+执行真实移除：
+
+```bash
+python manage_users.py remove-from-org \
+  --csv users.csv \
+  --org YOUR_ORG
+```
+
+真实执行时，脚本会显示将移除的用户数量和组织名，并要求输入：
+
+```text
+yes
+```
+
+只有输入完全匹配 `yes` 时才会调用 API；其他输入会中止操作。
+
+对应 API：
+
+```text
+DELETE /orgs/{org}/members/{username}
 ```
 
 ## 5. 添加用户到 Cost Center
